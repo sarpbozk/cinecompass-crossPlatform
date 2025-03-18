@@ -1,4 +1,6 @@
-class Movie {
+import 'package:equatable/equatable.dart';
+
+class Movie extends Equatable {
   final int id;
   final String title;
   final String overview;
@@ -7,7 +9,7 @@ class Movie {
   final double voteAverage;
   final String releaseDate;
 
-  Movie({
+  const Movie({
     required this.id,
     required this.title,
     required this.overview,
@@ -36,4 +38,17 @@ class Movie {
   String get backdropUrl => backdropPath != null 
     ? 'https://image.tmdb.org/t/p/w500/$backdropPath'
     : 'https://via.placeholder.com/500x281?text=No+Image';
+    
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'overview': overview,
+    'poster_path': posterPath,
+    'backdrop_path': backdropPath,
+    'vote_average': voteAverage,
+    'release_date': releaseDate,
+  };
+  
+  @override
+  List<Object?> get props => [id, title, overview, posterPath, backdropPath, voteAverage, releaseDate];
 } 

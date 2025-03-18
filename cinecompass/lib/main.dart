@@ -1,20 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/favorites_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'blocs/favorites/favorites_bloc.dart';
+import 'blocs/favorites/favorites_event.dart';
+import 'blocs/movies/movies_bloc.dart';
 import 'screens/home_screen.dart';
 import 'screens/favorites_screen.dart';
+import 'services/movie_service.dart';
+import 'services/secure_storage_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize secure storage with API key
+  final secureStorage = SecureStorageService();
+  await secureStorage.initialize();
+  
+  runApp(MyApp(secureStorage: secureStorage));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final SecureStorageService secureStorage;
+  
+  const MyApp({super.key, required this.secureStorage});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (ctx) => FavoritesProvider(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<FavoritesBloc>(
+          create: (context) => FavoritesBloc()..add(LoadFavorites()),
+        ),
+        BlocProvider<MoviesBloc>(
+          create: (context) => MoviesBloc(
+            movieService: MovieService(),
+          ),
+        ),
+      ],
       child: MaterialApp(
         title: 'CineCompass',
         theme: ThemeData(

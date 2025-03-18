@@ -1,14 +1,25 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/movie.dart';
+import 'secure_storage_service.dart';
 
 class MovieService {
   static const String _baseUrl = 'https://api.themoviedb.org/3';
-  static const String _apiKey = 'a6c08cda11c5499ee1534afbd6143955';
+  final SecureStorageService _secureStorage = SecureStorageService();
+  
+  Future<String> _getApiKey() async {
+    final apiKey = await _secureStorage.getApiKey();
+    if (apiKey == null) {
+      await _secureStorage.initialize();
+      return await _secureStorage.getApiKey() ?? '';
+    }
+    return apiKey;
+  }
   
   Future<List<Movie>> getTrendingMovies() async {
+    final apiKey = await _getApiKey();
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/top_rated?api_key=$_apiKey'),
+      Uri.parse('$_baseUrl/movie/top_rated?api_key=$apiKey'),
     );
     
     if (response.statusCode == 200) {
@@ -26,8 +37,9 @@ class MovieService {
       return [];
     }
     
+    final apiKey = await _getApiKey();
     final response = await http.get(
-      Uri.parse('$_baseUrl/search/movie?api_key=$_apiKey&query=$query'),
+      Uri.parse('$_baseUrl/search/movie?api_key=$apiKey&query=$query'),
     );
     
     if (response.statusCode == 200) {
@@ -41,8 +53,9 @@ class MovieService {
   }
   
   Future<Movie> getMovieDetails(int movieId) async {
+    final apiKey = await _getApiKey();
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId?api_key=$_apiKey'),
+      Uri.parse('$_baseUrl/movie/$movieId?api_key=$apiKey'),
     );
     
     if (response.statusCode == 200) {

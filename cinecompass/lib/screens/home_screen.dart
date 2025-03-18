@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/movie.dart';
-import '../services/movie_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../blocs/movies/movies_bloc.dart';
+import '../blocs/movies/movies_event.dart';
+import '../blocs/movies/movies_state.dart';
 import '../widgets/movie_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -12,19 +14,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final MovieService _movieService = MovieService();
   final TextEditingController _searchController = TextEditingController();
-  List<Movie> _movies = [];
-  bool _isLoading = true;
-  bool _isSearching = false;
-  String _searchQuery = '';
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _loadTrendingMovies();
     _searchController.addListener(_onSearchChanged);
+    // Load trending movies when screen initializes
+    context.read<MoviesBloc>().add(LoadTrendingMovies());
   }
 
   @override
@@ -38,63 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (_searchController.text.length >= 2) {
-        setState(() {
-          _searchQuery = _searchController.text;
-          _isSearching = true;
-        });
-        _searchMovies(_searchQuery);
-      } else if (_searchController.text.isEmpty) {
-        setState(() {
-          _isSearching = false;
-        });
-        _loadTrendingMovies();
+      if (_searchController.text.isEmpty) {
+        context.read<MoviesBloc>().add(LoadTrendingMovies());
+      } else if (_searchController.text.length >= 2) {
+        context.read<MoviesBloc>().add(SearchMovies(_searchController.text));
       }
     });
-  }
-
-  Future<void> _loadTrendingMovies() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final movies = await _movieService.getTrendingMovies();
-      setState(() {
-        _movies = movies;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorSnackBar('Failed to load trending movies');
-    }
-  }
-
-  Future<void> _searchMovies(String query) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final movies = await _movieService.searchMovies(query);
-      setState(() {
-        _movies = movies;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorSnackBar('Failed to search movies');
-    }
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
   }
 
   @override
@@ -127,30 +74,40 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _movies.isEmpty
-                    ? Center(
-                        child: Text(
-                          _isSearching
-                              ? 'No results found for "$_searchQuery"'
-                              : 'No trending movies available',
-                        ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(8.0),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.6,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: _movies.length,
-                        itemBuilder: (context, index) {
-                          return MovieCard(movie: _movies[index]);
-                        },
+            child: BlocBuilder<MoviesBloc, MoviesState>(
+              builder: (context, state) {
+                if (state is MoviesLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (state is MoviesLoaded) {
+                  if (state.movies.isEmpty) {
+                    return Center(
+                      child: Text(
+                        state.isSearchResult
+                            ? 'No results found for "${state.searchQuery}"'
+                            : 'No trending movies available',
                       ),
+                    );
+                  }
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(8.0),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.6,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: state.movies.length,
+                    itemBuilder: (context, index) {
+                      return MovieCard(movie: state.movies[index]);
+                    },
+                  );
+                } else if (state is MoviesError) {
+                  return Center(child: Text(state.message));
+                } else {
+                  return const Center(child: Text('Start searching for movies'));
+                }
+              },
+            ),
           ),
         ],
       ),
